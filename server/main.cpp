@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <string.h>
 #include <cstring>
 
 #define BUFLEN 1024
@@ -13,17 +12,37 @@ using namespace std;
 
 class Server{
 	int server_sockfd, client_sockfd;
-	int server_len, client_len;
+	socklen_t server_len, client_len;
 	sockaddr_in server_addr;
 	sockaddr_in client_addr;
+	int port;
+	int getLength(int fd){
+		char c;
+		int len = 0;
+		while(read(fd, &c, 1)) len++;
+		lseek(fd, 0, 0);
+		return len;
+	}
+	char* IntToString(int a){
+		char* s = new char[11];
+		sprintf(s, "%d", a);
+		strcat(s, "\0");
+		return s;
+	}
 public:
 	Server(int port = 8080){
 		server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
 		server_addr.sin_family = AF_INET;
 		server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 		server_addr.sin_port = htons(port);
+		this->port = port;
 		server_len = sizeof(server_addr);
-		cout << "Port = " << port << endl;
+	}
+	void setPort(int port){
+		server_addr.sin_port = htons(port);
+	}
+	int getPort() const{
+		return port;
 	}
 	void Sbind(){
 		if(bind(server_sockfd, (struct sockaddr *)&server_addr, server_len) < 0){
@@ -38,13 +57,14 @@ public:
 		}
 	}
 	void Saccept(){
-		client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_addr, (socklen_t*)&client_len);
+		client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_addr, &client_len);
 		if(client_sockfd < 0){
 			cerr << "Can't accept (not fatal error)" << endl;
 		}
 	}
 	void Srequest(){
-		int len;
+		int len, fileLength;
+		char* strFileLength;
 		char buf[BUFLEN];
 		if((len = recv(client_sockfd, &buf, BUFLEN, 0)) < 0){
 			shutdown(client_sockfd, 1);
@@ -52,10 +72,20 @@ public:
 			cout << "Error with reading socket" << endl;
 			exit(3);
 		}
+		int fd;
 		if(strncmp(buf, "GET /", 5)){
-			strcpy(buf, "HTTP/1.0 400 Bad Request\n");
+			fd = open("501.html", O_RDONLY);
+			fileLength = getLength(fd);
+			strcpy(buf, "HTTP/1.0 501 NotImplemented\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContent-type: text/html\nContet-length: ");
+			strFileLength = IntToString(fileLength);
+			strcat(buf, strFileLength);
+			strcat(buf, "\n\n");
 			len = strlen(buf);
 			send(client_sockfd, &buf, len, 0);
+			while((len = read(fd, buf, BUFLEN)) > 0){
+				send(client_sockfd, &buf, len, 0);
+			}
+			delete [] strFileLength;
 			shutdown(client_sockfd, 1);
 			close(client_sockfd);
 			cout << "Error: BadRequest" << endl;
@@ -65,28 +95,37 @@ public:
 		while(buf[i] && (buf[i++] > ' '));
 		buf[i-1] = 0;
 		cout << "received = " << buf + 5 << endl;
-		int fd;
 		if((fd = open(buf+5, O_RDONLY)) < 0){
-			strcpy(buf, "HTTP/1.0 404 PageNotFound\n\n\n");
+			fd = open("404.html", O_RDONLY);
+			fileLength = getLength(fd);
+			strcpy(buf, "HTTP/1.0 404 PageNotFound\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContent-type:text/html\nContent-length: ");
+			strFileLength = IntToString(fileLength);
+			strcat(buf, strFileLength);
+			strcat(buf, "\n\n");
 			len = strlen(buf);
 			send(client_sockfd, &buf, len, 0);
-			fd = open("404.html", O_RDONLY);
 			while((len = read(fd, buf, BUFLEN)) > 0){
 				send(client_sockfd, &buf, len, 0);
 			}
+			delete [] strFileLength;
 			shutdown(client_sockfd, 1);
 			close(client_sockfd);
 			cout << "Error: 404" << endl;
 			return;
 		}
 		
-		strcpy(buf, "HTTP/1.0 200 BikmetovDanilServer\nAllow: GET\n\n");
+		fileLength = getLength(fd);
+		strcpy(buf, "HTTP/1.0 200 BikmetovDanilServer\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContent-type:text/html\nContent-length: ");
+		strFileLength = IntToString(fileLength);
+			strcat(buf, strFileLength);
+		strcat(buf, "\n\n");
 		len = strlen(buf);
 		send(client_sockfd, &buf, len, 0);
 		
 		while((len = read(fd, buf, BUFLEN)) > 0){
 			send(client_sockfd, &buf, len, 0);
 		}
+		delete [] strFileLength;
 		close(fd);
 		shutdown(client_sockfd, 1);
 		close(client_sockfd);
@@ -94,8 +133,12 @@ public:
 	}
 };
 
-int main(){
-	Server server(8080);
+int main(int argc, char* argv[]){
+	Server server;
+	if(argc > 1){
+		server.setPort(atoi(argv[1]));
+	}
+	cout << "Port = " << server.getPort() << endl;
 	server.Sbind();
 	server.Slisten();
 	while(1){
