@@ -10,25 +10,13 @@
 #define BUFLEN 1024
 using namespace std;
 
+char* IntToString(int);
+
 class Server{
-	int server_sockfd, client_sockfd;
-	socklen_t server_len, client_len;
+	int server_sockfd;
+	socklen_t server_len;
 	sockaddr_in server_addr;
-	sockaddr_in client_addr;
 	int port;
-	int getLength(int fd){
-		char c;
-		int len = 0;
-		while(read(fd, &c, 1)) len++;
-		lseek(fd, 0, 0);
-		return len;
-	}
-	char* IntToString(int a){
-		char* s = new char[11];
-		sprintf(s, "%d", a);
-		strcat(s, "\0");
-		return s;
-	}
 public:
 	Server(int port = 8080){
 		server_sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -44,6 +32,9 @@ public:
 	int getPort() const{
 		return port;
 	}
+	int getSocket() const{
+		return server_sockfd;
+	}
 	void Sbind(){
 		if(bind(server_sockfd, (struct sockaddr *)&server_addr, server_len) < 0){
 			cerr << "Can't bind socket" << endl;
@@ -56,13 +47,28 @@ public:
 			exit(2);
 		}
 	}
-	void Saccept(){
+};
+
+class Client{
+	int client_sockfd;
+	socklen_t client_len;
+	sockaddr_in client_addr;
+	int getLength(int fd){
+		char c;
+		int len = 0;
+		while(read(fd, &c, 1)) len++;
+		lseek(fd, 0, 0);
+		return len;
+	}
+public:
+	void Caccept(int server_sockfd){
+		client_len = sizeof(client_addr);
 		client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_addr, &client_len);
 		if(client_sockfd < 0){
 			cerr << "Can't accept (not fatal error)" << endl;
 		}
 	}
-	void Srequest(){
+	void Crequest(){
 		int len, fileLength;
 		char* strFileLength;
 		char buf[BUFLEN];
@@ -117,7 +123,7 @@ public:
 		fileLength = getLength(fd);
 		strcpy(buf, "HTTP/1.0 200 BikmetovDanilServer\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContent-type:text/html\nContent-length: ");
 		strFileLength = IntToString(fileLength);
-			strcat(buf, strFileLength);
+		strcat(buf, strFileLength);
 		strcat(buf, "\n\n");
 		len = strlen(buf);
 		send(client_sockfd, &buf, len, 0);
@@ -133,8 +139,16 @@ public:
 	}
 };
 
+char* IntToString(int a){
+	char* s = new char[11];
+	sprintf(s, "%d", a);
+	strcat(s, "\0");
+	return s;
+}
+
 int main(int argc, char* argv[]){
 	Server server;
+	Client client;
 	if(argc > 1){
 		server.setPort(atoi(argv[1]));
 	}
@@ -142,8 +156,8 @@ int main(int argc, char* argv[]){
 	server.Sbind();
 	server.Slisten();
 	while(1){
-		server.Saccept();
-		server.Srequest();
+		client.Caccept(server.getSocket());
+		client.Crequest();
 	}
 	return 0;
 }
