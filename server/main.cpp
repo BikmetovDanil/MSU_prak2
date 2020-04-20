@@ -16,6 +16,8 @@
 #define BUFLEN 1024
 using namespace std;
 
+char* IntToString(int);
+
 struct PidSet{
 	int size;
 	int* arr;
@@ -98,119 +100,6 @@ class Client{
 		lseek(fd, 0, 0);
 		return len;
 	}
-	char* IntToString(int a){
-		char* s = new char[10];
-		sprintf(s, "%d", a);
-		strcat(s, "\0");
-		return s;
-	}
-	void str_put(char* dest, const char* src){
-		dest = new char[strlen(src) + 1];
-		strcpy(dest, src);
-		dest[strlen(src)] = 0;
-	}
-public:
-	void client_accept(Server & server){
-		client_len = sizeof(client_addr);
-		client_sockfd = accept(server.get_socket(), (struct sockaddr *)&client_addr, &client_len);
-		if(client_sockfd < 0){
-			cout << "Can't accept (not fatal error)" << endl;
-		}
-	}
-	int client_read(){
-		if((len = recv(client_sockfd, &buf, BUFLEN, 0)) < 0){
-			shutdown(client_sockfd, 1);
-			close(client_sockfd);
-			cerr << "Error with reading socket" << endl;
-			exit(3);
-		}
-		if(!isalpha(buf[0])) return -1;
-		if(strncmp(buf, "GET /", 5)){
-			client_send("501.html", "HTTP/1.0 501 NotImplemented");
-			shutdown(client_sockfd, 1);
-			close(client_sockfd);
-			cerr << "Error: BadRequest" << endl;
-			return 1;
-		}
-		int i = 5;
-		while(buf[i] && (buf[i++] > ' '));
-		buf[i-1] = 0;
-		return 0;
-	}
-	int client_request(Server & server){
-		if(client_read() == -1) return 0;
-		if(is_cgi()){
-			int pid = fork();
-			if(pid < 0){
-				cerr << "Не удалось создать процесс" << endl;
-				exit(6);
-			}else if(pid == 0){
-				char** argv = new char*[2];
-				argv[0] = get_argv0();
-				argv[1] = NULL;
-				char** env = new char*[7];
-				str_put(env[0], "SERVER_ADDR=127.0.0.1");
-				str_put(env[1], "CONTENT_TYPE=text/plain");
-				str_put(env[2], "SERVER_PROTOCOL=HTTP/1.0");
-				// Добавить str_put2
-				char* str_first = get_first();
-				env[3] = new char[strlen("SCRIPT_NAME=")+strlen(str_first)+1];
-				strcpy(env[3], "SCRIPT_NAME=");
-				strcat(env[3], buf + 5);
-				char* str_port = IntToString(server.get_port());
-				env[4] = new char[strlen("SERVER_PORT=") + 5];
-				strcpy(env[4], "SERVER_PORT=");
-				strcat(env[4], str_port);
-				delete [] str_port;
-				char* str_all_env = get_all_env();
-				env[5] = new char[strlen("QUERRY_STRING=")+strlen(str_all_env)+1];
-				strcpy(env[5], "QUERRY_STRING=");
-				strcat(env[5], str_all_env);
-				delete [] str_all_env;
-				env[6] = NULL;
-				int fd = open("tmp.txt", O_TRUNC | O_WRONLY);
-				dup2(fd, 1);
-				close(fd);
-				execvpe(argv[0], argv, env);
-				cerr << "Не удалось запустить cgi" << endl;
-				exit(7);
-			}else{
-				pids.add(pid);
-				return 1;
-			}
-		}else{
-			if(strlen(buf) > 5 && (fd = open(buf+5, O_RDONLY)) < 0){
-				client_send("404.html", "HTTP/1.0 404 PageNotFound");
-				shutdown(client_sockfd, 1);
-				close(client_sockfd);
-				cerr << "Error: 404" << endl;
-				return 0;
-			}
-			if(!strcmp(buf+5, "")) strcpy(buf+5, "index.html");
-			client_send(buf+5, "HTTP/1.0 200 BikmetovDanilServer");
-			shutdown(client_sockfd, 1);
-			close(client_sockfd);
-		}
-		return 0;
-	}
-	void client_send(const char* file, const char* header){
-		int fileLength;
-		char* strFileLength;
-		fd = open(file, O_RDONLY);
-		fileLength = getLength(fd);
-		strcpy(buf, header);
-		strcat(buf, "\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContet-length: ");
-		strFileLength = IntToString(fileLength);
-		strcat(buf, strFileLength);
-		strcat(buf, "\n\n");
-		len = strlen(buf);
-		send(client_sockfd, &buf, len, 0);
-		while((len = read(fd, buf, BUFLEN)) > 0){
-			send(client_sockfd, &buf, len, 0);
-		}
-		delete [] strFileLength;
-		close(fd);
-	}
 	bool is_cgi(){
 		char* last = get_last();
 		for(unsigned int i = 0; i < strlen(last); i++){
@@ -271,6 +160,131 @@ public:
 		last[j] = 0;
 		return last;
 	}
+	void str_put(char* dest, const char* src){
+		dest = new char[strlen(src) + 1];
+		strcpy(dest, src);
+		dest[strlen(src)] = 0;
+	}
+	void str_put2(char* dest, const char* src1, const char* src2){
+		dest = new char[strlen(src1) + strlen(src2) + 1];
+		strcpy(dest, src1);
+		strcat(dest, src2);
+		dest[strlen(src1) + strlen(src2)] = 0;
+	}
+public:
+	void client_accept(Server & server){
+		client_len = sizeof(client_addr);
+		client_sockfd = accept(server.get_socket(), (struct sockaddr *)&client_addr, &client_len);
+		if(client_sockfd < 0){
+			cout << "Can't accept (not fatal error)" << endl;
+		}
+	}
+	int client_read(){
+		if((len = recv(client_sockfd, &buf, BUFLEN, 0)) < 0){
+			shutdown(client_sockfd, 1);
+			close(client_sockfd);
+			cerr << "Error with reading socket" << endl;
+			exit(3);
+		}
+		if(!isalpha(buf[0])) return -1;
+		if(strncmp(buf, "GET /", 5)){
+			client_send("501.html", "HTTP/1.0 501 NotImplemented");
+			shutdown(client_sockfd, 1);
+			close(client_sockfd);
+			cerr << "Error: BadRequest" << endl;
+			return 501;
+		}
+		int i = 5;
+		while(buf[i] && (buf[i++] > ' '));
+		buf[i-1] = 0;
+		return 0;
+	}
+	int client_request(Server & server){
+		if(client_read() == -1) return 0;
+		if(is_cgi()){
+			int pid = fork();
+			if(pid < 0){
+				cerr << "Не удалось создать процесс" << endl;
+				exit(6);
+			}else if(pid == 0){
+				char** argv = new char*[2];
+				argv[0] = get_argv0();
+				argv[1] = NULL;
+				char** env = new char*[7];
+				str_put(env[0], "SERVER_ADDR=127.0.0.1");
+				str_put(env[1], "CONTENT_TYPE=text/plain");
+				str_put(env[2], "SERVER_PROTOCOL=HTTP/1.0");
+				char* str_first = get_first();
+				str_put2(env[3], "SCRIPT_NAME=", str_first);
+				delete [] str_first;
+				char* str_port = IntToString(server.get_port());
+				str_put2(env[4], "SERVER_PORT=", str_port);
+				delete [] str_port;
+				char* str_all_env = get_all_env();
+				str_put2(env[5], "QUERRY_STRING=", str_all_env);
+				delete [] str_all_env;
+				env[6] = NULL;
+				char* str_pid = IntToString(getpid());
+				char* filename = new char[strlen(str_pid) + 8];
+				strcpy(filename, "tmp");
+				strcat(filename, str_pid);
+				strcat(filename, ".txt");
+				filename[strlen(str_pid) + 7] = 0;
+				creat(filename, 0666);
+				int fd = open(filename, O_TRUNC | O_WRONLY);
+				if(fd < 0){
+					cout << "Ошибка при создании файла" << endl;
+					exit(9);
+				}
+				dup2(fd, 1);
+				close(fd);
+				execvpe(argv[0], argv, env);
+				cerr << "Не удалось запустить cgi" << endl;
+				delete [] str_pid;
+				delete [] filename;
+				delete [] argv[0];
+				delete [] argv[1];
+				for(int i = 0; i < 7; i++) delete [] env[i];
+				delete [] argv;
+				delete [] env;
+				exit(7);
+			}else{
+				pids.add(pid);
+				return 1;
+			}
+		}else{
+			if(strlen(buf) > 5 && (fd = open(buf+5, O_RDONLY)) < 0){
+				client_send("404.html", "HTTP/1.0 404 PageNotFound");
+				shutdown(client_sockfd, 1);
+				close(client_sockfd);
+				cerr << "Error: 404" << endl;
+				return 404;
+			}
+			if(!strcmp(buf+5, "")) strcpy(buf+5, "index.html");
+			client_send(buf+5, "HTTP/1.0 200 BikmetovDanilServer");
+			shutdown(client_sockfd, 1);
+			close(client_sockfd);
+		}
+		return 0;
+	}
+	void client_send(const char* file, const char* header){
+		int fileLength;
+		char* strFileLength;
+		fd = open(file, O_RDONLY);
+		fileLength = getLength(fd);
+		strcpy(buf, header);
+		strcat(buf, "\nAllow: GET\nServer: BikmetovDanilServer/0.1\nConnection: keep-alive\nContet-length: ");
+		strFileLength = IntToString(fileLength);
+		strcat(buf, strFileLength);
+		strcat(buf, "\n\n");
+		len = strlen(buf);
+		send(client_sockfd, &buf, len, 0);
+		while((len = read(fd, buf, BUFLEN)) > 0){
+			send(client_sockfd, &buf, len, 0);
+		}
+		delete [] strFileLength;
+		close(fd);
+	}
 	char* get_buf(){
 		return buf;
 	}
@@ -318,7 +332,15 @@ int main(int argc, char* argv[]){
 		for(int i = 0; i < pids.size; i++){
 			if(waitpid(pids[i], &status, WNOHANG)){
 				if(WIFEXITED(status)){
-					client.client_send("tmp.txt", "HTTP/1.0 200 BikmetovDanilServer");
+					char* str_pid = IntToString(pids[i]);
+					char* filename = new char[strlen(str_pid) + 8];
+					strcpy(filename, "tmp");
+					strcat(filename, str_pid);
+					strcat(filename, ".txt");
+					client.client_send(filename, "HTTP/1.0 200 BikmetovDanilServer");
+					remove(filename);
+					delete[] str_pid;
+					delete[] filename;
 				}else{
 					client.client_send("cgierror.html", "HTTP/1.0 500 BikmetovDanilServer");
 				}
@@ -329,4 +351,11 @@ int main(int argc, char* argv[]){
 		}
 	}
 	return 0;
+}
+
+char* IntToString(int a){
+	char* s = new char[10];
+	sprintf(s, "%d", a);
+	strcat(s, "\0");
+	return s;
 }
