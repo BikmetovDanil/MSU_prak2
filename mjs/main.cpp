@@ -2,19 +2,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <stack>
 #include <algorithm>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#define TD_SIZE 29
 
 using namespace std;
 
 enum type_of_lex{
 	LEX_NULL,
-	LEX_AND, LEX_BEGIN, LEX_WRITE, //... 
+	LEX_END, LEX_BEGIN, LEX_WRITE, LEX_LPAR, LEX_RPAR, LEX_DEF, LEX_AND, LEX_OR,
 	LEX_FIN,
-	LEX_SEMICOLON, LEX_COMMA, LEX_STR, LEX_GEQ, //... 
+	LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_STR, LEX_LESS, LEX_GRT,
+	LEX_EQ, LEX_INC, LEX_DEC, LEX_PLUS, LEX_MINUS, LEX_MUL, LEX_DIV,
+	LEX_PLUSD, LEX_MINUSD, LEX_MULD, LEX_DIVD,
+	LEX_MOD, LEX_MODD, LEX_LEX_EQ, LEX_NEQ, LEX_GEQ, LEX_LEQ, LEX_EQ2, LEX_NEQ2,
 	LEX_NUM,
 	LEX_IDENT,
 	POLIZ_LABEL,
@@ -112,11 +117,9 @@ int put(const string & buf){
 class Scanner{
 	FILE *fp;
 	int c;
-	int look(const string & buf, string* list) {
-		int i = 0;
-		while(list[i] != "") {
+	int look(const string & buf, string* list){
+		for(int i = 0; i < TD_SIZE; i++){
 			if(buf == list[i]) return i;
-			i++;
 		}
 		return 0;
 	}
@@ -125,6 +128,7 @@ class Scanner{
 	}
 public:
 	static string TW[], TD[];
+	static type_of_lex dlms[];
 	Scanner(const char* program){
 		fp = fopen(program, "r");
 		if(fp == NULL){
@@ -139,10 +143,15 @@ string Scanner::TW[] = {"", "and", "begin", "bool", "do", "else", "end",
 					"if", "false", "int", "not", "or", "program", "read",
 					"then", "true", "var", "while", "write"};
 					
-string Scanner::TD[] = {"", ";", "@", ",", ":", ":=", "(", ")",
-					"=", "<", ">", "+", "-", "*", "/", "<=", ">="};
+string Scanner::TD[] = {"", ";", ",", ":", "(", ")",
+					"=", "<", ">", "+", "-", "*", "/", "<=", ">=",
+					"==", "!=", "===", "!==", "+=", "++", "-=", "--",
+					"*=", "/=", "%", "%=", "&&", "||"};
 					
-type_of_lex dlms[25];
+type_of_lex Scanner::dlms[] = {LEX_NULL, LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_LPAR, LEX_RPAR,
+					LEX_DEF, LEX_LESS, LEX_GRT, LEX_PLUS, LEX_MINUS, LEX_MUL, LEX_DIV, LEX_LEQ, LEX_GEQ,
+					LEX_EQ, LEX_NEQ, LEX_EQ2, LEX_NEQ2, LEX_PLUSD, LEX_INC, LEX_MINUSD, LEX_DEC,
+					LEX_MULD, LEX_DIVD, LEX_MOD, LEX_MODD, LEX_AND, LEX_OR};
 					
 Lex Scanner::get_lex(){
 	enum state{H, ERR, IDENT, NUMB, FLOAT, E, EPLUS, EMINUS, STR1, STR2, ECR1, ECR2, PLUS, MINUS,
@@ -190,6 +199,9 @@ Lex Scanner::get_lex(){
 					buf.push_back(c);
 					gc();
 					CS = SLASH;
+				}else if(c == '#'){
+					CS = COM1;
+					gc();
 				}else if(c == '<' || c == '>' || c == '*' || c == '%'){
 					buf.push_back(c);
 					gc();
@@ -200,12 +212,10 @@ Lex Scanner::get_lex(){
 					CS = AL2;
 				}else if(c == '{'){
 					gc();
-					Lex(LEX_BEGIN);
-					CS = H;
+					return Lex(LEX_BEGIN);
 				}else if(c == '}'){
 					gc();
-					Lex(LEX_END);
-					CS = H;
+					return Lex(LEX_END);
 				}else if(c == EOF){
 					CS = FIN;
 				}else{
@@ -218,8 +228,8 @@ Lex Scanner::get_lex(){
 					gc();
 					CS = IDENT;
 				}else{
-					Lex(LEX_IDENT, buf);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(LEX_IDENT, buf);
 				}
 				break;
 			case NUMB:
@@ -235,8 +245,8 @@ Lex Scanner::get_lex(){
 					gc();
 					CS = E;
 				}else{
-					Lex(LEX_NUM, d);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(LEX_NUM, d);
 				}
 				break;
 			case FLOAT:
@@ -249,16 +259,17 @@ Lex Scanner::get_lex(){
 					gc();
 					CS = E;
 				}else{
-					Lex(LEX_NUM, d);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(LEX_NUM, d);
 				}
 				break;
 			case E:
+				s = 0;
 				if(c == '-'){
-					s = 0;
-					CS = EMINUS;
+					gc();
+					if(isdigit(c)) CS = EMINUS;
+					else CS = ERR;
 				}else if(isdigit(c)){
-					s = 0;
 					CS = EPLUS;
 				}else{
 					CS = ERR;
@@ -271,8 +282,8 @@ Lex Scanner::get_lex(){
 					CS = EPLUS;
 				}else{
 					for(int i = 0; i < s; i++) d *= 10;
-					Lex(LEX_NUM, d);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(LEX_NUM, d);
 				}
 				break;
 			case EMINUS:
@@ -282,8 +293,8 @@ Lex Scanner::get_lex(){
 					CS = EMINUS;
 				}else{
 					for(int i = 0; i < s; i++) d /= 10;
-					Lex(LEX_NUM, d);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(LEX_NUM, d);
 				}
 				break;
 			case STR1:
@@ -295,9 +306,7 @@ Lex Scanner::get_lex(){
 					CS = ERR;			
 				}
 				else if(c == '\''){
-					gc();
-					Lex(LEX_STR, buf);
-					CS = H;
+					return Lex(LEX_STR, buf);
 				}
 				else{
 					gc();
@@ -310,12 +319,10 @@ Lex Scanner::get_lex(){
 					CS = ECR2;
 				}
 				else if(c == EOF){
-					CS = ERR;			
+					CS = ERR;
 				}
 				else if(c == '\"'){
-					gc();
-					Lex(LEX_STR, buf);
-					CS = H;
+					return Lex(LEX_STR, buf);
 				}
 				else{
 					gc();
@@ -329,7 +336,7 @@ Lex Scanner::get_lex(){
 					CS = STR1;
 				}
 				else if(c == EOF){
-					CS = ERR;			
+					CS = ERR;
 				}
 				else if(c == '\''){
 					gc();
@@ -337,7 +344,7 @@ Lex Scanner::get_lex(){
 					CS = STR1;
 				}
 				else{
-					CS = ERR;	
+					CS = ERR;
 				}
 				break;
 			case ECR2:
@@ -347,7 +354,7 @@ Lex Scanner::get_lex(){
 					CS = STR2;
 				}
 				else if(c == EOF){
-					CS = ERR;	
+					CS = ERR;
 				}
 				else if(c == '\"'){
 					gc();
@@ -362,37 +369,29 @@ Lex Scanner::get_lex(){
 				if(c == '=' || c == '+'){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case MINUS:
 				if(c == '=' || c == '-'){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case AMP:
 				if(c == '&'){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					CS = ERR;
 				}
@@ -401,9 +400,7 @@ Lex Scanner::get_lex(){
 				if(c == '|'){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					CS = ERR;
 				}
@@ -412,9 +409,7 @@ Lex Scanner::get_lex(){
 				if(c == '='){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else if(c == '/'){
 					buf.pop_back();
 					gc();
@@ -425,14 +420,12 @@ Lex Scanner::get_lex(){
 					CS = COM2;
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case COM1:
 				if(c == '\n'){
-					gc();
 					CS = H;
 				}else{
 					gc();
@@ -452,7 +445,6 @@ Lex Scanner::get_lex(){
 				break;
 			case COM3:
 				if(c == '/'){
-					gc();
 					CS = H;
 				}else{
 					CS = COM2;
@@ -462,13 +454,11 @@ Lex Scanner::get_lex(){
 				if(c == '='){
 					buf.push_back(c);
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					gc();
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case AL2:
@@ -478,28 +468,25 @@ Lex Scanner::get_lex(){
 					CS = AL3;
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case AL3:
 				if(c == '='){
 					buf.push_back(c);
-					gc();
 					CS = AL3;
 				}else{
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					CS = H;
+					fseek(fp, -1, SEEK_CUR);
+					return Lex(dlms[j], j);
 				}
 				break;
 			case OTHER:
-				if(c == ':' || c == ',' || c == '(' || c == ')' || c == '[' || c == ']' || c == '.'){
+				if(c == ':' || c == ',' || c == '(' || c == ')' || c == '[' || c == ']' || c == '.' || c == ';'){
 					buf.push_back(c);
-					gc();
 					j = look(buf, TD);
-					Lex(dlms[j], j);
-					CS = H;
+					return Lex(dlms[j], j);
 				}else{
 					CS = ERR;
 				}
@@ -508,24 +495,55 @@ Lex Scanner::get_lex(){
 				throw(c);
 				break;
 			case FIN:
-				cout << "Программа верна" << endl;
-				exit(0);
+				return Lex(LEX_FIN);
 		}
 	}
 }
+
+class Parser{
+	Lex curr_lex;
+	type_of_lex c_type;
+	int c_val;
+	Scanner scan;
+	stack <int> st_int;
+	stack <type_of_lex> st_lex;
+	// ...
+	void gl(){
+		
+	}
+public:
+	vector <Lex> poliz;
+	Parser(const char* program): scan(program){}
+	void analyze();
+};
 
 int main(int argc, char* argv[]){
 	if(argc < 2){
 		cerr << "Введите файл с программой" << endl;
 		exit(1);
 	}
+	
 	Scanner scan(argv[1]);
 	try{
-		scan.get_lex();
+		Lex cur_lex = LEX_NULL;
+		while(cur_lex.get_type() != LEX_FIN){
+			cur_lex = scan.get_lex();
+			cout << cur_lex << endl;
+		}
+		cout << "Лексически программа верна" << endl;
 	}catch(int c){
 		if(c == EOF) cout << "Ошибка: неожиданный конец файла" << endl;
-		else cout << "Ошибка в символе: " << (int)c << endl;
+		else cout << "Ошибка в символе: " << (char)c << endl;
 		exit(2);
+	}
+	
+	Parser pars(argv[1]);
+	try{
+		// Подключаем Parser
+		cout << "Синтаксически программа верна" << endl;
+	}catch(int c){
+		// Обработка ошибок
+		exit(3);
 	}
 	return 0;
 }
