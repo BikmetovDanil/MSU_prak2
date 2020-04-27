@@ -1,0 +1,8 @@
+for(var a in x){
+	for(;;){
+		a++;
+		b++;
+		if(true) continue;
+		else return 1;
+	}
+}

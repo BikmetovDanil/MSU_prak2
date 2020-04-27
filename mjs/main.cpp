@@ -8,20 +8,20 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-#define TD_SIZE 29
 
 using namespace std;
 
 enum type_of_lex{
 	LEX_NULL,
 	LEX_END, LEX_BEGIN, LEX_WRITE, LEX_LPAR, LEX_RPAR, LEX_DEF, LEX_AND, LEX_OR,
-	LEX_FIN,
-	LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_STR, LEX_LESS, LEX_GRT,
-	LEX_EQ, LEX_INC, LEX_DEC, LEX_PLUS, LEX_MINUS, LEX_MUL, LEX_DIV,
-	LEX_PLUSD, LEX_MINUSD, LEX_MULD, LEX_DIVD,
+	LEX_FIN, LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_STR,
+	LEX_LESS, LEX_GRT,	LEX_EQ, LEX_INC, LEX_DEC, LEX_PLUS, LEX_MINUS,
+	LEX_MUL, LEX_DIV, LEX_PLUSD, LEX_MINUSD, LEX_MULD, LEX_DIVD,
 	LEX_MOD, LEX_MODD, LEX_LEX_EQ, LEX_NEQ, LEX_GEQ, LEX_LEQ, LEX_EQ2, LEX_NEQ2,
-	LEX_NUM,
-	LEX_IDENT,
+	LEX_NUM, LEX_IDENT,
+	KEY_DO, KEY_WHILE, KEY_FOR, KEY_IN, KEY_VAR,
+	KEY_FUNC, KEY_BREAK, KEY_CONT, KEY_RET,
+	KEY_IF, KEY_ELSE, KEY_TRUE, KEY_FALSE, KEY_READ, KEY_WRITE,
 	POLIZ_LABEL,
 	POLIZ_ADDRESS,
 	POLIZ_GO,
@@ -46,7 +46,7 @@ public:
 	type_of_lex get_type() const{
 		return t_lex;
 	}
-	int get_value ( ) const{
+	int get_value() const{
 		return v_lex;
 	}
 	friend ostream& operator<<(ostream & s, Lex l){
@@ -118,8 +118,10 @@ class Scanner{
 	FILE *fp;
 	int c;
 	int look(const string & buf, string* list){
-		for(int i = 0; i < TD_SIZE; i++){
+		int i = 1;
+		while(list[i] != ""){
 			if(buf == list[i]) return i;
+			i++;
 		}
 		return 0;
 	}
@@ -128,7 +130,7 @@ class Scanner{
 	}
 public:
 	static string TW[], TD[];
-	static type_of_lex dlms[];
+	static type_of_lex dlms[], kwrd[];
 	Scanner(const char* program){
 		fp = fopen(program, "r");
 		if(fp == NULL){
@@ -139,9 +141,13 @@ public:
 	Lex get_lex();
 };
 
-string Scanner::TW[] = {"", "and", "begin", "bool", "do", "else", "end",
-					"if", "false", "int", "not", "or", "program", "read",
-					"then", "true", "var", "while", "write"};
+string Scanner::TW[] = {"", "do", "while", "for", "in", "var",
+					"function", "break", "continue", "return",
+					"if", "else", "true", "false", "read", "write"};
+					
+type_of_lex Scanner::kwrd[] = {LEX_NULL, KEY_DO, KEY_WHILE, KEY_FOR, KEY_IN, KEY_VAR,
+					KEY_FUNC, KEY_BREAK, KEY_CONT, KEY_RET,
+					KEY_IF, KEY_ELSE, KEY_TRUE, KEY_FALSE, KEY_READ, KEY_WRITE};
 					
 string Scanner::TD[] = {"", ";", ",", ":", "(", ")",
 					"=", "<", ">", "+", "-", "*", "/", "<=", ">=",
@@ -167,11 +173,9 @@ Lex Scanner::get_lex(){
 				if(c == ' ' || c == '\n' || c == '\r' || c == '\t'){
 					CS = H;
 				}else if(isalpha(c) || c == '_'){
-					buf.push_back(c);
 					CS = IDENT;
 				}else if(isdigit(c)){
 					d = 0;
-					buf.push_back(c);
 					CS = NUMB;
 				}else if(c == '\''){
 					gc();
@@ -211,10 +215,8 @@ Lex Scanner::get_lex(){
 					gc();
 					CS = AL2;
 				}else if(c == '{'){
-					gc();
 					return Lex(LEX_BEGIN);
 				}else if(c == '}'){
-					gc();
 					return Lex(LEX_END);
 				}else if(c == EOF){
 					CS = FIN;
@@ -229,6 +231,8 @@ Lex Scanner::get_lex(){
 					CS = IDENT;
 				}else{
 					fseek(fp, -1, SEEK_CUR);
+					j = look(buf, TW);
+					if(j > 0) return Lex(kwrd[j], j);
 					return Lex(LEX_IDENT, buf);
 				}
 				break;
@@ -302,8 +306,8 @@ Lex Scanner::get_lex(){
 					gc();
 					CS = ECR1;
 				}
-				else if(c == '@'){
-					CS = ERR;			
+				else if(c == EOF){
+					CS = ERR;
 				}
 				else if(c == '\''){
 					return Lex(LEX_STR, buf);
@@ -501,21 +505,191 @@ Lex Scanner::get_lex(){
 }
 
 class Parser{
-	Lex curr_lex;
+	Lex cur_lex;
 	type_of_lex c_type;
 	int c_val;
 	Scanner scan;
 	stack <int> st_int;
 	stack <type_of_lex> st_lex;
-	// ...
+	void S();
+	void SENTENCE();
+	void FUNC_DEF();
+	void OPERATOR();
+	void BLOCK();
+	void VAR_DEF();
+	void COND_OP();
+	void LOOP_OP();
+	void TRANSIT_OP();
+	void EXPR_OP();
 	void gl(){
-		
+		cur_lex = scan.get_lex();
+		c_type = cur_lex.get_type();
+		c_val = cur_lex.get_value();
+	}
+	bool is_expression(type_of_lex param){
+		return (param == LEX_IDENT) || (param == LEX_NUM) ||
+			(param == LEX_STR) ||
+			(param == KEY_TRUE) || (param == KEY_FALSE) ||
+			(param == LEX_INC) || (param == LEX_DEC);
 	}
 public:
 	vector <Lex> poliz;
 	Parser(const char* program): scan(program){}
 	void analyze();
 };
+
+void Parser::analyze(){
+	S();
+	if(c_type != LEX_FIN) throw(cur_lex);
+}
+
+void Parser::S(){
+	gl();
+	if(c_type != LEX_FIN){
+		SENTENCE();
+		S();
+	}
+}
+
+void Parser::SENTENCE(){
+	if(c_type == KEY_FUNC) FUNC_DEF();
+	else OPERATOR();
+}
+
+void Parser::FUNC_DEF(){
+	gl();
+	if(c_type != LEX_IDENT) throw(cur_lex);
+	gl();
+	if(c_type != LEX_LPAR) throw(cur_lex);
+	gl();
+	while(c_type != LEX_RPAR){
+		if(c_type == LEX_IDENT){
+			gl();
+			if(c_type == LEX_RPAR) break;
+			if(c_type != LEX_COMMA) throw(cur_lex);
+		}else throw(cur_lex);
+		gl();
+	}
+	gl();
+	BLOCK();
+}
+
+void Parser::OPERATOR(){
+	if(c_type == KEY_VAR) VAR_DEF();
+	else if(c_type == LEX_SEMICOLON) gl();
+	else if(c_type == LEX_BEGIN) BLOCK();
+	else if(c_type == KEY_IF) COND_OP();
+	else if(c_type == KEY_DO || c_type == KEY_WHILE || c_type == KEY_FOR) LOOP_OP();
+	else if(c_type == KEY_BREAK || c_type == KEY_CONT || c_type == KEY_RET) TRANSIT_OP();
+	else if(is_expression(c_type)) EXPR_OP();
+	else throw(cur_lex);
+}
+
+void Parser::BLOCK(){
+	if(c_type != LEX_BEGIN) throw(cur_lex);
+	gl();
+	while(c_type != LEX_END){
+		if(c_type == LEX_FIN) throw(cur_lex);
+		OPERATOR();
+	}
+	gl();
+}
+
+void Parser::VAR_DEF(){
+	do{
+		gl();
+		if(c_type != LEX_IDENT) throw(cur_lex);
+		gl();
+		if(c_type == LEX_DEF){
+			gl();
+			if(is_expression(c_type)) EXPR_OP();
+			else throw(cur_lex);
+		}
+	}while(c_type == LEX_COMMA);
+	if(c_type != LEX_SEMICOLON) throw(cur_lex);
+	gl();
+}
+
+void Parser::COND_OP(){
+	gl();
+	if(c_type != LEX_LPAR) throw(cur_lex);
+	gl();
+	if(is_expression(c_type)) EXPR_OP();
+	else throw(cur_lex);
+	if(c_type != LEX_RPAR) throw(cur_lex);
+	gl();
+	OPERATOR();
+	if(c_type == KEY_ELSE){
+		gl();
+		OPERATOR();
+	}
+}
+
+void Parser::LOOP_OP(){
+	if(c_type == KEY_WHILE){
+		gl();
+		if(c_type != LEX_LPAR) throw(cur_lex);
+		gl();
+		if(is_expression(c_type)) EXPR_OP();
+		else throw(cur_lex);
+		if(c_type != LEX_RPAR) throw(cur_lex);
+		gl();
+		OPERATOR();
+	}else if(c_type == KEY_DO){
+		gl();
+		OPERATOR();
+		if(c_type != KEY_WHILE) throw(cur_lex);
+		gl();
+		if(c_type != LEX_LPAR) throw(cur_lex);
+		gl();
+		if(is_expression(c_type)) EXPR_OP();
+		else throw(cur_lex);
+		if(c_type != LEX_RPAR) throw(cur_lex);
+		gl();
+		if(c_type != LEX_SEMICOLON) throw(cur_lex);
+		gl();
+	}else if(c_type == KEY_FOR){
+		gl();
+		if(c_type != LEX_LPAR) throw(cur_lex);
+		gl();
+		if(is_expression(c_type) || c_type == LEX_SEMICOLON){
+			if(is_expression(c_type)) EXPR_OP();
+			else if(c_type != LEX_SEMICOLON) throw(cur_lex);
+			gl();
+			if(is_expression(c_type)) EXPR_OP();
+			else if(c_type != LEX_SEMICOLON) throw(cur_lex);
+			gl();
+			if(is_expression(c_type)) EXPR_OP();
+			if(c_type != LEX_RPAR) throw(cur_lex);
+			gl();
+			OPERATOR();
+		}else if(c_type == KEY_VAR){
+			if(c_type == KEY_VAR) gl();
+			gl();
+			if(c_type != KEY_IN) throw(cur_lex);
+			gl();
+			if(is_expression(c_type)) EXPR_OP();
+			else throw(cur_lex);
+			if(c_type != LEX_RPAR) throw(cur_lex);
+			gl();
+			OPERATOR();
+		}else throw(cur_lex);
+	}
+}
+
+void Parser::TRANSIT_OP(){
+	if(c_type == KEY_RET){
+		gl();
+		if(is_expression(c_type)) EXPR_OP();
+	}else gl();
+	if(c_type != LEX_SEMICOLON) throw(cur_lex);
+	gl();
+}
+
+void Parser::EXPR_OP(){
+	// Сделать <expression> !!!
+	gl();
+}
 
 int main(int argc, char* argv[]){
 	if(argc < 2){
@@ -539,10 +713,10 @@ int main(int argc, char* argv[]){
 	
 	Parser pars(argv[1]);
 	try{
-		// Подключаем Parser
+		pars.analyze();
 		cout << "Синтаксически программа верна" << endl;
-	}catch(int c){
-		// Обработка ошибок
+	}catch(Lex lex){
+		cout << "Ошибка в лексеме: " << lex << endl;
 		exit(3);
 	}
 	return 0;
