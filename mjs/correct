@@ -1,8 +1,20 @@
-for(var a in x){
-	for(;;){
-		a++;
-		b++;
-		if(true) continue;
-		else return 1;
-	}
+var a = 0, x = [0, 1, 2, 3];
+
+++a += x[0];
+
+var i;
+for(i = 0; i < 10; i++){
+	write(i);
 }
+
+for(var a in x){
+	a++;
+}
+
+while(a < 5){
+	a--;
+}
+
+do{
+	a++;
+}while(a < 10);
