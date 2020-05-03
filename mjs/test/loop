@@ -23,12 +23,5 @@ for(i = 0; i < 10; i++){
 	write(i);
 }
 
-write("\n", "Начинаю работу с массивом:\n");
-
-var ar = [5, 100, "Hello", 999];
-for(i = 0; i < 3; i++){
-	write(ar[i+1], "\n");
-}
-ar[0] = "world";
-write(ar[1 + 1], ", ", ar[0], "!\n");
+write("\n");
 

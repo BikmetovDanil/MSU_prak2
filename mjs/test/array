@@ -1,0 +1,8 @@
+var s = [5, 100, "Hello", 999];
+var i;
+for(i = 0; i < 3; i++){
+	write(s[i+1], "\n");
+}
+s[0] = "world";
+write(s[1 + 1], ", ", s[0], "!\n");
+
