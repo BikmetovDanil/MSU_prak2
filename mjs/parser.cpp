@@ -10,19 +10,19 @@ void Parser::dec(type_of_lex type){
 		if(TID[i].get_declare()) throw "Twice declare";
 		else{
 			TID[i].put_declare();
-			TID[i].put_type(type);
+			change_type(type, i);
 		}
 	}
-	var_type = LEX_NULL;
+	var_type = LEX_UNDEF;
 }
 
 void Parser::dec(type_of_lex type, int val){
 	if(TID[val].get_declare()) throw "Twice declare";
 	else{
 		TID[val].put_declare();
-		TID[val].put_type(type);
+		change_type(type, val);
 	}
-	var_type = LEX_NULL;
+	var_type = LEX_UNDEF;
 }
 
 void Parser::check_ident(){
@@ -149,16 +149,23 @@ void Parser::VAR_DEF(){
 			if(is_expression(c_type)){
 				EXPRESSION();
 				if(var_type == KEY_TRUE || var_type == KEY_FALSE) var_type = LEX_BOOL;
-				dec(var_type);
+				dec(var_type, prev_val);
 				prog.put_lex(Lex(LEX_DEF));
 			}else if(c_type == LEX_LSQB){
+				int pl0 = prog[prog.get_free() - 1].get_value();
+				prog.put_lex(Lex(LEX_NUM, 0));
+				prog.put_lex(Lex(POLIZ_EXPR));
 				dec(LEX_ARR, prev_val);
-				prog.pop();
 				int offset = 0;
 				gl();
 				while(c_type != LEX_RSQB){
-					prog.put_lex(Lex(POLIZ_ADDRESS, transform(prev_val, offset)));
+					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+					prog.put_lex(Lex(LEX_NUM, offset));
+					prog.put_lex(Lex(POLIZ_EXPR));
+					int pl1 = prog.get_free();
+					prog.blank();
 					EXPRESSION();
+					prog.put_lex(Lex(var_type), pl1);
 					prog.put_lex(Lex(LEX_DEF));
 					offset++;
 					if(c_type == LEX_COMMA) gl();
@@ -167,39 +174,62 @@ void Parser::VAR_DEF(){
 				gl();
 			}else if(c_type == OBJ_ENV){
 				ENV();
-			}else throw(cur_lex);
-		}else dec(LEX_UNDEF);
+			}else throw(cur_lex, prev_val);
+		}else dec(LEX_UNDEF, prev_val);
 	}while(c_type == LEX_COMMA);
 	if(c_type != LEX_SEMICOLON) throw(cur_lex);
 	gl();
 }
 
 void Parser::COND_OP(){
+	int pl0, pl1;
 	gl();
 	if(c_type != LEX_LPAR) throw(cur_lex);
 	gl();
 	if(is_expression(c_type)) EXPRESSION();
 	else throw(cur_lex);
+	eq_bool();
 	if(c_type != LEX_RPAR) throw(cur_lex);
 	gl();
+	pl0 = prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex(POLIZ_FGO));
 	OPERATOR();
+	pl1 = prog.get_free();
+	prog.blank();
+	prog.put_lex(Lex(POLIZ_GO));
 	if(c_type == KEY_ELSE){
+		prog.put_lex(Lex(POLIZ_LABEL, prog.get_free()), pl0);
 		gl();
 		OPERATOR();
+		prog.put_lex(Lex(POLIZ_LABEL, prog.get_free()), pl1);
+	}else{
+		prog.put_lex(Lex(POLIZ_LABEL, prog.get_free()), pl0);
+		prog.put_lex(Lex(POLIZ_LABEL, prog.get_free()), pl1);
 	}
 }
 
 void Parser::LOOP_OP(){
+	int pl0, pl1, pl2, pl3, pl4;
 	if(c_type == KEY_WHILE){
 		gl();
 		if(c_type != LEX_LPAR) throw(cur_lex);
 		gl();
+		pl0 = prog.get_free();
 		if(is_expression(c_type)) EXPRESSION();
 		else throw(cur_lex);
+		eq_bool();
+		pl1 = prog.get_free();
+		prog.blank();
+		prog.put_lex(Lex(POLIZ_FGO));
 		if(c_type != LEX_RPAR) throw(cur_lex);
 		gl();
 		OPERATOR();
+		prog.put_lex(Lex(POLIZ_LABEL, pl0));
+		prog.put_lex(Lex(POLIZ_GO));
+		prog.put_lex(Lex(POLIZ_LABEL, prog.get_free()), pl1);
 	}else if(c_type == KEY_DO){
+		pl0 = prog.get_free();
 		gl();
 		OPERATOR();
 		if(c_type != KEY_WHILE) throw(cur_lex);
@@ -208,10 +238,18 @@ void Parser::LOOP_OP(){
 		gl();
 		if(is_expression(c_type)) EXPRESSION();
 		else throw(cur_lex);
+		eq_bool();
+		pl1 = prog.get_free();
+		prog.blank();
+		prog.put_lex(Lex(POLIZ_FGO));
+		prog.put_lex(Lex(POLIZ_LABEL, pl0));
+		prog.put_lex(Lex(POLIZ_GO));
 		if(c_type != LEX_RPAR) throw(cur_lex);
 		gl();
 		if(c_type != LEX_SEMICOLON) throw(cur_lex);
 		gl();
+		pl2 = prog.get_free();
+		prog.put_lex(Lex(POLIZ_LABEL, pl2), pl1);
 	}else if(c_type == KEY_FOR){
 		gl();
 		if(c_type != LEX_LPAR) throw(cur_lex);
@@ -220,13 +258,29 @@ void Parser::LOOP_OP(){
 			if(is_expression(c_type)) EXPRESSION();
 			else if(c_type != LEX_SEMICOLON) throw(cur_lex);
 			gl();
+			pl0 = prog.get_free();
 			if(is_expression(c_type)) EXPRESSION();
 			else if(c_type != LEX_SEMICOLON) throw(cur_lex);
+			eq_bool();
+			pl1 = prog.get_free();
+			prog.blank();
+			prog.put_lex(Lex(POLIZ_FGO));
+			prog.blank();
+			prog.put_lex(Lex(POLIZ_GO));
 			gl();
+			pl2 = prog.get_free();
 			if(is_expression(c_type)) EXPRESSION();
 			if(c_type != LEX_RPAR) throw(cur_lex);
+			prog.put_lex(Lex(POLIZ_LABEL, pl0));
+			prog.put_lex(Lex(POLIZ_GO));
 			gl();
+			pl3 = prog.get_free();
+			prog.put_lex(Lex(POLIZ_LABEL, pl3), pl1 + 2);
 			OPERATOR();
+			prog.put_lex(Lex(POLIZ_LABEL, pl2));
+			prog.put_lex(Lex(POLIZ_GO));
+			pl4 = prog.get_free();
+			prog.put_lex(Lex(POLIZ_LABEL, pl4), pl1);
 		}else if(c_type == KEY_VAR){
 			if(c_type == KEY_VAR) gl();
 			gl();
@@ -258,65 +312,74 @@ void Parser::EXPR_OP(){
 
 void Parser::EXPRESSION(){
 	l_value = true;
+	var_type = LEX_UNDEF;
 	E1();
 	if(c_type == LEX_EQ || c_type == LEX_LESS || c_type == LEX_GRT ||
 			c_type == LEX_LEQ || c_type == LEX_GEQ || c_type == LEX_NEQ ||
 			c_type == LEX_EQ2 || c_type == LEX_NEQ2){
 		var_type = LEX_BOOL; // MAY BE CHANGED
+		type_of_lex prev_type = c_type;
 		gl();
 		E1();
 		check_op();
-		prog.put_lex(cur_lex); //st_lex.push(c_type);
+		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
 
 void Parser::E1(){
 	E2();
 	while(c_type == LEX_PLUS || c_type == LEX_MINUS || c_type == LEX_OR){
+		type_of_lex prev_type = c_type;
 		gl();
 		E2();
 		check_op();
-		prog.put_lex(cur_lex); //st_lex.push(c_type);
+		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
 
 void Parser::E2(){
 	E3();
 	while(c_type == LEX_MUL || c_type == LEX_DIV || c_type == LEX_AND || c_type == LEX_MOD){
+		type_of_lex prev_type = c_type;
 		gl();
 		E3();
 		check_op();
-		prog.put_lex(cur_lex); //st_lex.push(c_type);
+		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
 
 void Parser::E3(){
 	if(c_type == LEX_IDENT){
 		check_ident();
+		int prev_val = c_val;
 		if(TID[c_val].get_type() == LEX_ARR){
-			int prev_val = c_val;
 			gl();
 			if(c_type == LEX_LSQB){
 				gl();
-				if(c_type != LEX_NUM) throw(cur_lex);
+				int pl0 = prog.get_free();
 				prog.put_lex(Lex(LEX_IDENT, c_val));
-				prev_val = transform(prev_val, c_val);
-				gl();
+				EXPRESSION();
+				prog.put_lex(Lex(POLIZ_EXPR));
+				int pl1 = prog.get_free();
+				prog.blank();
 				if(c_type != LEX_RSQB) throw(cur_lex);
 				gl();
 				if(l_value && is_def_operator()){
-					prog.pop();
-					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
-					D();
+					type_of_lex op = c_type;
+					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+					gl();
+					EXPRESSION();
+					prog.put_lex(Lex(var_type), pl1);
+					prog.put_lex(Lex(op));
 				}else if(l_value && (c_type == LEX_INC)){
-					prog.pop();
-					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+					prog.put_lex(Lex(LEX_NUM), pl1);
 					prog.put_lex(Lex(LEX_NUM, 1));
 					prog.put_lex(Lex(LEX_PLUSD));
 					gl();
 				}else if(l_value && (c_type == LEX_DEC)){
-					prog.pop();
-					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+					prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+					prog.put_lex(Lex(LEX_NUM), pl1);
 					prog.put_lex(Lex(LEX_NUM, 1));
 					prog.put_lex(Lex(LEX_MINUSD));
 					gl();
@@ -324,11 +387,11 @@ void Parser::E3(){
 			}
 		}else{
 			prog.put_lex(Lex(LEX_IDENT, c_val));
-			int prev_val = c_val;
 			gl();
 			if(l_value && is_def_operator()){
 				prog.pop();
-				prog.put_lex(POLIZ_ADDRESS, prev_val);
+				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+				var_type = TID[prev_val].get_type();
 				D();
 			}else if(l_value && (c_type == LEX_INC)){
 				prog.pop();
@@ -346,25 +409,18 @@ void Parser::E3(){
 		}
 	}else if(c_type == LEX_NUM){
 		st_lex.push(LEX_NUM);
-		if(var_type == LEX_NUM) var_type = LEX_NUM;
-		else if(var_type == LEX_STR) var_type = LEX_STR;
-		else if(var_type == LEX_BOOL) var_type = LEX_NUM;
-		else var_type = LEX_NUM;
+		if(var_type != LEX_STR) var_type = LEX_NUM;
 		prog.put_lex(cur_lex);
 		gl();
 	}else if(c_type == LEX_STR){
 		st_lex.push(LEX_STR);
-		if(var_type == LEX_NUM) var_type = LEX_STR;
-		else if(var_type == LEX_STR) var_type = LEX_STR;
-		else if(var_type == LEX_BOOL) var_type = LEX_STR;
-		else var_type = LEX_STR;
+		var_type = LEX_STR;
 		prog.put_lex(cur_lex);
 		gl();
 	}else if(c_type == KEY_TRUE){
 		st_lex.push(LEX_BOOL);
 		if(var_type == LEX_NUM) var_type = LEX_NUM;
 		else if(var_type == LEX_STR) var_type = LEX_STR;
-		else if(var_type == LEX_BOOL) var_type = LEX_BOOL;
 		else var_type = LEX_BOOL;
 		prog.put_lex(Lex(KEY_TRUE, 1));
 		gl();
@@ -372,7 +428,6 @@ void Parser::E3(){
 		st_lex.push(LEX_BOOL);
 		if(var_type == LEX_NUM) var_type = LEX_NUM;
 		else if(var_type == LEX_STR) var_type = LEX_STR;
-		else if(var_type == LEX_BOOL) var_type = LEX_BOOL;
 		else var_type = LEX_BOOL;
 		prog.put_lex(Lex(KEY_FALSE, 0));
 		gl();
@@ -394,9 +449,11 @@ void Parser::E3(){
 
 void Parser::D(){
 	if(is_def_operator()){
+		int pl0 = prog[prog.get_free() - 1].get_value();
 		type_of_lex op = c_type;
 		gl();
 		EXPRESSION();
+		change_type(var_type, pl0);
 		eq_type();
 		prog.put_lex(Lex(op));
 	}else throw(cur_lex);
@@ -404,32 +461,42 @@ void Parser::D(){
 
 void Parser::OPID(int flag){
 	check_ident();
+	int prev_val = c_val;
 	if(TID[c_val].get_type() == LEX_ARR){
-		int prev_val = c_val;
 		gl();
 		if(c_type == LEX_LSQB){
 			gl();
-			if(c_type != LEX_NUM) throw(cur_lex);
-			prev_val = transform(prev_val, c_val);
+			int pl0 = prog.get_free();
+			prog.put_lex(Lex(LEX_IDENT, c_val));
+			EXPRESSION();
+			prog.put_lex(Lex(POLIZ_EXPR));
+			int pl1 = prog.get_free();
+			prog.blank();
 			if(flag != 0){
-				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
-				if(flag == -1) prog.put_lex(Lex(LEX_NUM, -1));
-				else if(flag == 1) prog.put_lex(Lex(LEX_NUM, 1));
-				prog.put_lex(Lex(LEX_PLUSD));
+				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+				prog.put_lex(Lex(LEX_NUM), pl1);
+				prog.put_lex(Lex(LEX_NUM, 1));
+				if(flag == -1) prog.put_lex(Lex(LEX_MINUSD));
+				else if(flag == 1) prog.put_lex(Lex(LEX_PLUSD));
 			}
-			gl();
 			if(c_type != LEX_RSQB) throw(cur_lex);
 			gl();
 			if(is_def_operator()){
-				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
-				D();
+				type_of_lex op = c_type;
+				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+				gl();
+				EXPRESSION();
+				prog.put_lex(Lex(var_type), pl1);
+				prog.put_lex(Lex(op));
 			}else if(c_type == LEX_INC){
-				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+				prog.put_lex(Lex(LEX_NUM), pl1);
 				prog.put_lex(Lex(LEX_NUM, 1));
 				prog.put_lex(Lex(LEX_PLUSD));
 				gl();
 			}else if(c_type == LEX_DEC){
-				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+				prog.put_lex(Lex(POLIZ_ADDRESS, prev_val), pl0);
+				prog.put_lex(Lex(LEX_NUM), pl1);
 				prog.put_lex(Lex(LEX_NUM, 1));
 				prog.put_lex(Lex(LEX_MINUSD));
 				gl();
@@ -438,16 +505,16 @@ void Parser::OPID(int flag){
 			gl();
 		}else EXPRESSION();
 	}else{
-		int prev_val = c_val;
 		if(flag != 0){
 			prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
-			if(flag == -1) prog.put_lex(Lex(LEX_NUM, -1));
-			else if(flag == 1) prog.put_lex(Lex(LEX_NUM, 1));
-			prog.put_lex(Lex(LEX_PLUSD));
+			prog.put_lex(Lex(LEX_NUM, 1));
+			if(flag == -1) prog.put_lex(Lex(LEX_MINUSD));
+			else if(flag == 1) prog.put_lex(Lex(LEX_PLUSD));
 		}
 		gl();
 		if(is_def_operator()){
 			prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
+			var_type = TID[prev_val].get_type();
 			D();
 		}else if(c_type == LEX_INC){
 			prog.put_lex(Lex(POLIZ_ADDRESS, prev_val));
@@ -467,9 +534,8 @@ void Parser::READ(){
 	gl();
 	if(c_type != LEX_LPAR) throw(cur_lex);
 	gl();
-	if(c_type == LEX_IDENT){
-		
-	}else throw(cur_lex);
+	if(c_type == LEX_IDENT)	prog.put_lex(Lex(KEY_READ, c_val));
+	else throw(cur_lex);
 	gl();
 	if(c_type != LEX_RPAR) throw(cur_lex);
 	gl();
@@ -479,22 +545,40 @@ void Parser::WRITE(){
 	gl();
 	if(c_type != LEX_LPAR) throw(cur_lex);
 	gl();
-	if(c_type == LEX_IDENT || c_type == LEX_NUM || c_type == LEX_STR || c_type == LEX_BOOL){
-		cout << c_val << endl;
-	}else throw(cur_lex);
-	gl();
-	if(c_type != LEX_RPAR) throw(cur_lex);
+	while(c_type != LEX_RPAR){
+		prog.put_lex(Lex(KEY_WRITE));
+		prog.put_lex(cur_lex);
+		gl();
+		if(c_type == LEX_LSQB){
+			gl();
+			EXPRESSION();
+			prog.put_lex(Lex(POLIZ_EXPR));
+			if(c_type != LEX_RSQB) throw(cur_lex);
+			gl();
+		}
+		if(c_type == LEX_RPAR) break;
+		else if(c_type != LEX_COMMA) throw(cur_lex);
+		gl();
+	}
 	gl();
 }
 
 void Parser::ENV(){
 	gl();
-	cout << cur_lex << endl;
 	if(c_type != LEX_DOT) throw(cur_lex);
 	gl();
 	gl();
 }
 
-int transform(int val, int offset){
-	return (offset << 16) + val;
+void Parser::change_type(type_of_lex type, int index){
+	prog.put_lex(Lex(POLIZ_CHANGE));
+	prog.put_lex(Lex(type, index));
+	TID[index].put_type(type);
+}
+
+void Parser::change_type(type_of_lex type, int index, int offset){
+	prog.put_lex(Lex(POLIZ_CHANGE));
+	int i = TID[index][offset];
+	prog.put_lex(Lex(type, i));
+	TID[i].put_type(type);
 }

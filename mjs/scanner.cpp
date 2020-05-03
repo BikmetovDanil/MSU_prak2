@@ -1,5 +1,7 @@
 #include "scanner.h"
 
+using namespace std;
+
 vector <Ident> TID;
 
 int put(const string & buf){
@@ -9,6 +11,28 @@ int put(const string & buf){
 	}
 	TID.push_back(Ident(buf));
 	return TID.size() - 1;
+}
+
+int Ident::operator[](int index){
+	int size = elem.size() - 1;
+	while(index > size){
+		Ident ident;
+		ident.put_type(LEX_UNDEF);
+		ident.put_declare();
+		TID.push_back(ident);
+		elem.push_back(TID.size() - 1);
+		size++;
+	}
+	return elem[index];
+}
+
+Scanner::Scanner(const char* program){
+	fp = fopen(program, "r");
+	TID.reserve(1000); // Very important :)
+	if(fp == NULL){
+		std::cerr << "Не удалось открыть программу" << std::endl;
+		exit(1);
+	}
 }
 
 string Scanner::TW[] = {"", "do", "while", "for", "in", "var",
@@ -180,67 +204,63 @@ Lex Scanner::get_lex(){
 				if(c == '\\'){
 					gc();
 					CS = ECR1;
-				}
-				else if(c == EOF){
+				}else if(c == EOF){
 					CS = ERR;
-				}
-				else if(c == '\''){
+				}else if(c == '\''){
 					return Lex(LEX_STR, buf);
-				}
-				else{
-					gc();
+				}else{
 					buf.push_back(c);
+					gc();
 				}
 				break;
 			case STR2:
 				if(c == '\\'){
 					gc();
 					CS = ECR2;
-				}
-				else if(c == EOF){
+				}else if(c == EOF){
 					CS = ERR;
-				}
-				else if(c == '\"'){
+				}else if(c == '\"'){
 					return Lex(LEX_STR, buf);
-				}
-				else{
-					gc();
+				}else{
 					buf.push_back(c);
+					gc();
 				}
 				break;
 			case ECR1:
 				if(c == '\\'){
-					gc();
 					buf.push_back('\\');
-					CS = STR1;
-				}
-				else if(c == EOF){
-					CS = ERR;
-				}
-				else if(c == '\''){
 					gc();
-					buf.push_back('\'');
 					CS = STR1;
-				}
-				else{
+				}else if(c == EOF){
+					CS = ERR;
+				}else if(c == '\''){
+					buf.push_back('\'');
+					gc();
+					CS = STR1;
+				}else if(c == 'n'){
+					buf.push_back('\n');
+					gc();
+					CS = STR1;
+				}else{
 					CS = ERR;
 				}
 				break;
 			case ECR2:
 				if(c == '\\'){
-					gc();
 					buf.push_back('\\');
-					CS = STR2;
-				}
-				else if(c == EOF){
-					CS = ERR;
-				}
-				else if(c == '\"'){
 					gc();
-					buf.push_back('\"');
 					CS = STR2;
-				}
-				else{
+				}else if(c == EOF){
+					CS = ERR;
+				}else if(c == '\"'){
+					buf.push_back('\"');
+					gc();
+					CS = STR2;
+				}else if(c == 'n'){
+					buf.push_back('\n');
+					gc();
+					CS = STR2;
+				}else{
 					CS = ERR;
 				}
 				break;

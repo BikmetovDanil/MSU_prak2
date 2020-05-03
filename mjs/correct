@@ -1,20 +1,26 @@
-var a = 0, x = [0, 1, 2, 3];
+var i = 0;
 
-++a += x[0];
+while(i < 10){
+	write(i, "");
+	i++;
+}
+write("\n");
 
-var i;
+i = "Hello, world!";
+write(i, "\n");
+
+var s = 0;
+i = 1;
+
+
+do{
+	s = i*i*i;
+	write(i, " в кубе равно ", s, "\n");
+	i++;
+}while(i < 10);
+
 for(i = 0; i < 10; i++){
 	write(i);
 }
 
-for(var a in x){
-	a++;
-}
-
-while(a < 5){
-	a--;
-}
-
-do{
-	a++;
-}while(a < 10);
+write("\n");

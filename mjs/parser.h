@@ -58,6 +58,8 @@ class Parser{
 	void TRANSIT_OP(); void EXPR_OP(); void EXPRESSION();
 	void E1(); void E2(); void E3(); void D();
 	void OPID(int); void WRITE(); void READ(); void ENV();
+	void change_type(type_of_lex, int);
+	void change_type(type_of_lex, int, int);
 	
 	bool is_expression(type_of_lex param){
 		return (param == LEX_IDENT) || (param == LEX_NUM) ||

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <string.h>
 
+using namespace std;
 using std::string;
 using std::vector;
 using std::ostream;
@@ -26,15 +27,17 @@ enum type_of_lex{
 	KEY_FUNC, KEY_BREAK, KEY_CONT, KEY_RET, // 49-52
 	KEY_IF, KEY_ELSE, KEY_TRUE, KEY_FALSE, KEY_READ, KEY_WRITE, // 53-58
 	OBJ_RESP, OBJ_ENV, // 59-60
-	POLIZ_LABEL, POLIZ_ADDRESS, POLIZ_GO, POLIZ_FGO // 61-64
+	POLIZ_LABEL, POLIZ_ADDRESS, POLIZ_GO, POLIZ_FGO, POLIZ_CHANGE, POLIZ_EXPR // 61-66
 };
 
 class Lex{
 	type_of_lex t_lex;
 	int v_lex;
+	string n_lex;
 public:
 	Lex(type_of_lex t = LEX_NULL){
 		t_lex = t;
+		v_lex = 0;
 	}
 	Lex(type_of_lex t, int v){
 		t_lex = t;
@@ -42,13 +45,17 @@ public:
 	}
 	Lex(type_of_lex t, string s){
 		t_lex = t;
-		v_lex = 0; // Временно
+		v_lex = 0;
+		n_lex = s;
 	}
 	type_of_lex get_type() const{
 		return t_lex;
 	}
 	int get_value() const{
 		return v_lex;
+	}
+	string get_name() const{
+		return n_lex;
 	}
 	friend ostream& operator<<(ostream & s, Lex l){
 		s << '(' << l.t_lex << ',' << l.v_lex << ");" ;
@@ -58,22 +65,28 @@ public:
 
 class Ident{
 	string name;
-	bool declare;
+	bool declare, assign;
 	type_of_lex type;
-	bool assign;
 	int value;
 public:
+	vector <int> elem;
 	Ident(){
+		elem.clear();
 		declare = false;
 		assign = false;
 	}
 	Ident(const string n){
 		name = n;
+		elem.clear();
 		declare = false;
 		assign = false;
 	}
 	bool operator==(const string& s) const{
 		return name == s;
+	}
+	int operator[](int);
+	void put_name(string n){
+		name = n;
 	}
 	string get_name(){
 		return name;
@@ -123,12 +136,6 @@ class Scanner{
 public:
 	static string TW[], TD[];
 	static type_of_lex dlms[], kwrd[];
-	Scanner(const char* program){
-		fp = fopen(program, "r");
-		if(fp == NULL){
-			std::cerr << "Не удалось открыть программу" << std::endl;
-			exit(1);
-		}
-	}
+	Scanner(const char*);
 	Lex get_lex();
 };
