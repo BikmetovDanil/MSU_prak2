@@ -95,6 +95,7 @@ void Executer::execute(Poliz& prog){
 				else if(pc_el.get_type() == LEX_IDENT){
 					i = pc_el.get_value();
 					if(TID[i].get_type() == LEX_ARR){
+						index++;
 						t = get_expr(prog);
 						j = t.value;
 						k = TID[i][j];
@@ -517,7 +518,18 @@ Arg Executer::get_expr(Poliz& prog){
 				break;
 			case LEX_IDENT:
 				i = pc_el.get_value();
-				args.push(Arg(LEX_IDENT, TID[i].get_value()));
+				if(TID[i].get_type() == LEX_ARR){
+					index++;
+					t = get_expr(prog);
+					j = t.value;
+					pc_el = prog[++index];
+					k = TID[i][j];
+					if(TID[k].get_type() == LEX_STR) args.push(Arg(LEX_STR, TID[k].get_name()));
+					else args.push(Arg(TID[k].get_type(), TID[k].get_value()));
+				}else{
+					if(TID[i].get_type() == LEX_STR) args.push(Arg(LEX_STR, TID[i].get_name()));
+					else args.push(Arg(TID[i].get_type(), TID[i].get_value()));
+				}
 				break;
 			case LEX_PLUS:
 				t = args.pop();

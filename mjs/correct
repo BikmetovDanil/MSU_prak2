@@ -29,8 +29,9 @@ ar[0] = 5;
 ar[1] = 100;
 ar[2] = "Hello";
 ar[3] = 999;
+i = 0;
 for(i = 0; i < 3; i++){
-	Response.write(ar[i+1], "\n");
+	Response.write(ar[i], "\n");
 }
 ar[0] = "world";
 Response.write(ar[1 + 1], ", ", ar[0], "!\n");
