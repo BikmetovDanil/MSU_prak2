@@ -3,19 +3,6 @@
 using namespace std;
 extern vector<Ident> TID;
 
-void Parser::dec(type_of_lex type){
-	int i;
-	while(!st_int.is_empty()){
-		i = st_int.pop();
-		if(TID[i].get_declare()) throw "Twice declare";
-		else{
-			TID[i].put_declare();
-			change_type(type, i);
-		}
-	}
-	var_type = LEX_UNDEF;
-}
-
 void Parser::dec(type_of_lex type, int val){
 	if(TID[val].get_declare()) throw "Twice declare";
 	else{
@@ -32,24 +19,10 @@ void Parser::check_ident(){
 	}else throw "Not declared";
 }
 
-// Операции можно проводить над любыми операндами
-void Parser::check_op(){
-	
-}
-
 // "!" работает только с переменными типа bool
 void Parser::check_not(){
 	if(st_lex.pop() != LEX_BOOL) throw "Wrong type is in not";
 	else st_lex.push(LEX_BOOL);
-}
-
-void Parser::eq_type(){
-	// num op num -> num
-	// str op str -> num
-	// str op num -> str
-	// str op bool -> str
-	// bool op num -> num / bool
-	// bool op bool -> num / bool
 }
 
 void Parser::eq_bool(){
@@ -321,7 +294,6 @@ void Parser::EXPRESSION(){
 		type_of_lex prev_type = c_type;
 		gl();
 		E1();
-		check_op();
 		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
@@ -332,7 +304,6 @@ void Parser::E1(){
 		type_of_lex prev_type = c_type;
 		gl();
 		E2();
-		check_op();
 		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
@@ -343,7 +314,6 @@ void Parser::E2(){
 		type_of_lex prev_type = c_type;
 		gl();
 		E3();
-		check_op();
 		prog.put_lex(prev_type); //st_lex.push(prev_type);
 	}
 }
@@ -357,7 +327,7 @@ void Parser::E3(){
 			if(c_type == LEX_LSQB){
 				gl();
 				int pl0 = prog.get_free();
-				prog.put_lex(Lex(LEX_IDENT, c_val));
+				prog.put_lex(Lex(LEX_IDENT, prev_val));
 				EXPRESSION();
 				prog.put_lex(Lex(POLIZ_EXPR));
 				int pl1 = prog.get_free();
@@ -454,7 +424,6 @@ void Parser::D(){
 		gl();
 		EXPRESSION();
 		change_type(var_type, pl0);
-		eq_type();
 		prog.put_lex(Lex(op));
 	}else throw(cur_lex);
 }

@@ -1,34 +1,41 @@
 var i = 0;
 
 while(i < 10){
-	write(i, "");
+	Response.write(i, " ");
 	i++;
 }
-write("\n");
+Response.write("\n");
 
 i = "Hello, world!";
-write(i, "\n");
+Response.write(i, "\n");
 
 var s = 0;
 i = 1;
 
-
 do{
 	s = i*i*i;
-	write(i, " в кубе равно ", s, "\n");
+	Response.write(i, " в кубе равно ", s, "\n");
 	i++;
 }while(i < 10);
 
 for(i = 0; i < 10; i++){
-	write(i);
+	Response.write(i);
 }
 
-write("\n", "Начинаю работу с массивом:\n");
+Response.write("\n", "Начинаю работу с массивом:\n");
 
-var ar = [5, 100, "Hello", 999];
+var ar = [];
+ar[0] = 5;
+ar[1] = 100;
+ar[2] = "Hello";
+ar[3] = 999;
 for(i = 0; i < 3; i++){
-	write(ar[i+1], "\n");
+	Response.write(ar[i+1], "\n");
 }
 ar[0] = "world";
-write(ar[1 + 1], ", ", ar[0], "!\n");
+Response.write(ar[1 + 1], ", ", ar[0], "!\n");
 
+ar[9] = "New element!";
+for(i = 0; i < 10; i++){
+	Response.write(ar[i], "\n");
+}
