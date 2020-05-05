@@ -12,7 +12,6 @@ write(i, "\n");
 var s = 0;
 i = 1;
 
-
 do{
 	s = i*i*i;
 	write(i, " в кубе равно ", s, "\n");

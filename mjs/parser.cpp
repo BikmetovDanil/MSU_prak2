@@ -548,8 +548,11 @@ void Parser::DOT(){
 	gl();
 	string action = TID[c_val].get_name();
 	prog.put_lex(Lex(LEX_STR, action));
-	if(action == "toString") var_type = LEX_STR;
-	else if(action == "MAX_VALUE") var_type = LEX_NUM;
+	if(action == "toString"){
+		var_type = LEX_STR;
+		gl();
+		gl();
+	}else if(action == "MAX_VALUE") var_type = LEX_NUM;
 	else if(action == "MIN_VALUE") var_type = LEX_NUM;
 	else if(action == "length") var_type = LEX_NUM;
 	TID.erase(--TID.end());

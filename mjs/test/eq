@@ -5,6 +5,6 @@ if(a == s){
 	write("a == s\n");
 }else write("a != s\n");
 
-if(a === s){
+if(a.toString() === s){
 	write("a === s\n");
 }else write("a !== s\n");
