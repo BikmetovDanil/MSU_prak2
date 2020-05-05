@@ -29,6 +29,7 @@ public:
 void Interpretator::interpretate(){
 	pars.analyze();
 	if(write_poliz) pars.prog.print();
+	cout << "Выполняю программу" << endl;
 	E.execute(pars.prog);
 }
 
@@ -39,8 +40,7 @@ int main(int argc, char* argv[]){
 	}
 	if(argc > 2 && !strcmp(argv[2], "poliz")) write_poliz = true;
 	else write_poliz = false;
-	
-	cout << "Выполняю программу" << endl;
+
 	Interpretator I(argv[1]);
 	try{
 		I.interpretate();

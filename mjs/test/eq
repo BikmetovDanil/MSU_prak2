@@ -1,0 +1,10 @@
+var a = 1;
+var s = "1";
+
+if(a == s){
+	write("a == s\n");
+}else write("a != s\n");
+
+if(a === s){
+	write("a === s\n");
+}else write("a !== s\n");

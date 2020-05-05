@@ -310,6 +310,10 @@ void Parser::E1(){
 
 void Parser::E2(){
 	E3();
+	if(c_type == LEX_DOT){
+		l_value = false;
+		DOT();
+	}
 	while(c_type == LEX_MUL || c_type == LEX_DIV || c_type == LEX_AND || c_type == LEX_MOD){
 		type_of_lex prev_type = c_type;
 		gl();
@@ -356,7 +360,7 @@ void Parser::E3(){
 				}
 			}
 		}else{
-			prog.put_lex(Lex(LEX_IDENT, c_val));
+			prog.put_lex(Lex(LEX_IDENT, prev_val));
 			gl();
 			if(l_value && is_def_operator()){
 				prog.pop();
@@ -536,6 +540,19 @@ void Parser::ENV(){
 	gl();
 	if(c_type != LEX_DOT) throw(cur_lex);
 	gl();
+	gl();
+}
+
+void Parser::DOT(){
+	prog.put_lex(Lex(LEX_DOT));
+	gl();
+	string action = TID[c_val].get_name();
+	prog.put_lex(Lex(LEX_STR, action));
+	if(action == "toString") var_type = LEX_STR;
+	else if(action == "MAX_VALUE") var_type = LEX_NUM;
+	else if(action == "MIN_VALUE") var_type = LEX_NUM;
+	else if(action == "length") var_type = LEX_NUM;
+	TID.erase(--TID.end());
 	gl();
 }
 

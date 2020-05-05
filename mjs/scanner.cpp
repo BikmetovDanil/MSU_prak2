@@ -374,7 +374,8 @@ Lex Scanner::get_lex(){
 			case AL3:
 				if(c == '='){
 					buf.push_back(c);
-					CS = AL3;
+					j = look(buf, TD);
+					return Lex(dlms[j], j);
 				}else{
 					j = look(buf, TD);
 					fseek(fp, -1, SEEK_CUR);

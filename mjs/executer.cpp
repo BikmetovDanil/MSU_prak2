@@ -384,13 +384,22 @@ void Executer::execute(Poliz& prog){
 				t = args.pop();
 				u = args.pop();
 				if(u.type == LEX_STR){
-					if(u.name == t.name) k = 1;
-					else k = 0;
-				}else if(u.type == POLIZ_ADDRESS){
-					if(TID[u.value].get_type() == LEX_STR){
-						if(u.name == t.name) k = 1;
-						else k = 0;
-					}else k = (u.value == t.value);
+					if(t.type == LEX_STR) k = (u.name == t.name);
+					else if(t.type == LEX_NUM) k = (u.name == to_string(t.value));
+					else if(t.type == LEX_BOOL){
+						if(u.name == "true") k = (t.value != 0);
+						else k = !t.value;
+					}
+				}else if(u.type == LEX_NUM){
+					if(t.type == LEX_STR) k = (to_string(u.value) == t.name);
+					else if(t.type == LEX_NUM)	k = (u.value == t.value);
+					else if(t.type == LEX_BOOL) k = (u.value != 0);
+				}else if(u.type == LEX_BOOL){
+					if(t.type == LEX_STR){
+						if(t.name == "true") k = (u.value != 0);
+						else k = !u.value;
+					}else if(t.type == LEX_NUM)	k = (t.value != 0);
+					else if(t.type == LEX_BOOL) k = (t.value && u.value) || (!t.value && !u.value);
 				}else k = (u.value == t.value);
 				args.push(Arg(LEX_BOOL, k));
 				break;
@@ -464,6 +473,40 @@ void Executer::execute(Poliz& prog){
 				}else k = (u.value != t.value);
 				args.push(Arg(LEX_BOOL, k));
 				break;
+			case LEX_EQ2:
+				t = args.pop();
+				u = args.pop();
+				if(t.type != u.type){
+					k = 0;
+				}else{
+					if(u.type == LEX_STR){
+						if(u.name == t.name) k = 1;
+						else k = 0;
+					}else if(u.type == POLIZ_ADDRESS){
+						if(TID[u.value].get_type() == LEX_STR){
+							if(u.name == t.name) k = 1;
+							else k = 0;
+						}else k = (u.value == t.value);
+					}else k = (u.value == t.value);
+				}
+				args.push(Arg(LEX_BOOL, k));
+				break;
+			case LEX_NEQ2:
+				t = args.pop();
+				u = args.pop();
+				if(t.type != u.type){
+					if(u.type == LEX_STR){
+						if(u.name != t.name) k = 1;
+						else k = 0;
+					}else if(u.type == POLIZ_ADDRESS){
+						if(TID[u.value].get_type() == LEX_STR){
+							if(u.name != t.name) k = 1;
+							else k = 0;
+						}else k = (u.value != t.value);
+					}else k = (u.value != t.value);
+				}
+				args.push(Arg(LEX_BOOL, k));
+				break;
 			case LEX_DEF:
 				t = args.pop();
 				u = args.pop();
@@ -481,6 +524,28 @@ void Executer::execute(Poliz& prog){
 					TID[j].put_type(LEX_UNDEF);
 				}
 				TID[j].put_assign();
+				break;
+			case LEX_DOT:
+				pc_el = prog[++index];
+				t = args.pop();
+				if(pc_el.get_name() == "toString"){
+					if(t.type == LEX_NUM) args.push(Arg(LEX_STR, to_string(t.value)));
+					else if(t.type == LEX_BOOL){
+						if(t.value) args.push(Arg(LEX_STR, "true"));
+						else args.push(Arg(LEX_STR, "false"));
+					}else args.push(t);
+				}else if(pc_el.get_name() == "MAX_VALUE"){
+					if(t.type == LEX_NUM) args.push(Arg(LEX_NUM, 2147483647));
+					else if(t.type == LEX_BOOL) args.push(Arg(LEX_NUM, 1));
+					else throw "Incorrect property";
+				}else if(pc_el.get_name() == "MIN_VALUE"){
+					if(t.type == LEX_NUM) args.push(Arg(LEX_NUM, -2147483648));
+					else if(t.type == LEX_BOOL) args.push(Arg(LEX_NUM, 0));
+					else throw "Incorrect property";
+				}else if(pc_el.get_name() == "length"){
+					if(t.type == LEX_ARR) args.push(Arg(LEX_NUM, TID[t.value].elem.size()));
+					else throw "Incorrect property";
+				}
 				break;
 			default:
 				break;
