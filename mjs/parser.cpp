@@ -147,6 +147,7 @@ void Parser::VAR_DEF(){
 				gl();
 			}else if(c_type == OBJ_ENV){
 				ENV();
+				prog.put_lex(Lex(LEX_DEF));
 			}else throw(cur_lex, prev_val);
 		}else dec(LEX_UNDEF, prev_val);
 	}while(c_type == LEX_COMMA);
@@ -520,8 +521,12 @@ void Parser::WRITE(){
 	gl();
 	while(c_type != LEX_RPAR){
 		prog.put_lex(Lex(KEY_WRITE));
-		prog.put_lex(cur_lex);
-		gl();
+		if(c_type == OBJ_ENV){
+			ENV();
+		}else{
+			prog.put_lex(cur_lex);
+			gl();
+		}
 		if(c_type == LEX_LSQB){
 			gl();
 			EXPRESSION();
@@ -537,9 +542,13 @@ void Parser::WRITE(){
 }
 
 void Parser::ENV(){
+	prog.put_lex(Lex(OBJ_ENV));
 	gl();
 	if(c_type != LEX_DOT) throw(cur_lex);
 	gl();
+	string action = TID[c_val].get_name();
+	prog.put_lex(Lex(LEX_STR, action));
+	TID.erase(--TID.end());
 	gl();
 }
 

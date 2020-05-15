@@ -19,6 +19,7 @@ void Executer::execute(Poliz& prog){
 	int i, j, k;
 	index = 0;
 	size = prog.get_free();
+	char* param;
 	while(index < size){
 		pc_el = prog[index];
 		switch(pc_el.get_type()){
@@ -91,6 +92,13 @@ void Executer::execute(Poliz& prog){
 				break;
 			case KEY_WRITE:
 				pc_el = prog[++index];
+				if(pc_el.get_type() == OBJ_ENV){
+					pc_el = prog[++index];
+					param = getenv(pc_el.get_name().c_str());
+					if(param == nullptr) cout << "NULL";
+					else cout << param;
+					break;
+				}
 				if(pc_el.get_type() == LEX_STR) cout << pc_el.get_name();
 				else if(pc_el.get_type() == LEX_IDENT){
 					i = pc_el.get_value();
@@ -524,6 +532,12 @@ void Executer::execute(Poliz& prog){
 					TID[j].put_type(LEX_UNDEF);
 				}
 				TID[j].put_assign();
+				break;
+			case OBJ_ENV:
+				pc_el = prog[++index];
+				param = getenv(pc_el.get_name().c_str());
+				if(param == nullptr) args.push(Arg(LEX_STR, "NULL"));
+				else args.push(Arg(LEX_STR, param));
 				break;
 			case LEX_DOT:
 				pc_el = prog[++index];

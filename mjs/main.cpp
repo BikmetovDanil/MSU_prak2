@@ -16,32 +16,31 @@ using std::vector;
 using std::ostream;
 
 int transform(int, int);
-bool write_poliz;
+bool write_poliz = false;
 
 class Interpretator{
 	Parser pars;
 	Executer E;
 public:
-	Interpretator(char* program): pars(program) {};
+	Interpretator(const char* program): pars(program) {};
 	void interpretate();
 };
 
 void Interpretator::interpretate(){
 	pars.analyze();
 	if(write_poliz) pars.prog.print();
-	cout << "Выполняю программу" << endl;
 	E.execute(pars.prog);
 }
 
 int main(int argc, char* argv[]){
-	if(argc < 2){
+	/*if(argc < 2){
 		std::cerr << "Введите файл с программой" << std::endl;
 		exit(1);
 	}
 	if(argc > 2 && !strcmp(argv[2], "poliz")) write_poliz = true;
-	else write_poliz = false;
+	else write_poliz = false;*/
 
-	Interpretator I(argv[1]);
+	Interpretator I("/home/danil/git/server/cgi-bin/test"); // #!
 	try{
 		I.interpretate();
 	}catch(int c){

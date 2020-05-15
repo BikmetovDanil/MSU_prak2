@@ -160,16 +160,18 @@ class Client{
 		last[j] = 0;
 		return last;
 	}
-	void str_put(char* dest, const char* src){
-		dest = new char[strlen(src) + 1];
+	char* str_put(const char* src){
+		char* dest = new char[strlen(src) + 1];
 		strcpy(dest, src);
 		dest[strlen(src)] = 0;
+		return dest;
 	}
-	void str_put2(char* dest, const char* src1, const char* src2){
-		dest = new char[strlen(src1) + strlen(src2) + 1];
+	char* str_put2(const char* src1, const char* src2){
+		char* dest = new char[(int)strlen(src1) + (int)strlen(src2) + 1];
 		strcpy(dest, src1);
 		strcat(dest, src2);
 		dest[strlen(src1) + strlen(src2)] = 0;
+		return dest;
 	}
 public:
 	void client_accept(Server & server){
@@ -208,20 +210,23 @@ public:
 				exit(6);
 			}else if(pid == 0){
 				char** argv = new char*[2];
-				argv[0] = get_argv0();
+				char* s = get_argv0();
+				argv[0] = new char[20];
+				strcpy(argv[0], "./");
+				strcat(argv[0], s);
 				argv[1] = NULL;
 				char** env = new char*[7];
-				str_put(env[0], "SERVER_ADDR=127.0.0.1");
-				str_put(env[1], "CONTENT_TYPE=text/plain");
-				str_put(env[2], "SERVER_PROTOCOL=HTTP/1.0");
+				env[0] = str_put("SERVER_ADDR=127.0.0.1");
+				env[1] = str_put("CONTENT_TYPE=text/plain");
+				env[2] = str_put("SERVER_PROTOCOL=HTTP/1.0");
 				char* str_first = get_first();
-				str_put2(env[3], "SCRIPT_NAME=", str_first);
+				env[3] = str_put2("SCRIPT_NAME=", str_first);
 				delete [] str_first;
 				char* str_port = IntToString(server.get_port());
-				str_put2(env[4], "SERVER_PORT=", str_port);
+				env[4] = str_put2("SERVER_PORT=", str_port);
 				delete [] str_port;
 				char* str_all_env = get_all_env();
-				str_put2(env[5], "QUERRY_STRING=", str_all_env);
+				env[5] = str_put2("QUERY_STRING=", str_all_env);
 				delete [] str_all_env;
 				env[6] = NULL;
 				char* str_pid = IntToString(getpid());
@@ -236,8 +241,10 @@ public:
 					cout << "Ошибка при создании файла" << endl;
 					exit(9);
 				}
+				cout << "Start: " << argv[0] << "," << argv[1] << endl;
 				dup2(fd, 1);
 				close(fd);
+				chdir("cgi-bin");
 				execvpe(argv[0], argv, env);
 				cerr << "Не удалось запустить cgi" << endl;
 				delete [] str_pid;
