@@ -1,22 +1,23 @@
 #! /home/danil/git/server/cgi-bin/main
-var i;
-var k = 15;
+var i, j;
 var header = "Тестовая страница на MJS";
 var s = 0;
-for(i = 1; i <= k; i++){
-	s = s + i;
-}
 write("<html>");
 write("<meta charset=\"utf-8\">");
 write("<body>");
 write("<h1>", header, "</h1>");
 write("<p>Параметры запроса: ", Environment.QUERY_STRING, "</p>");
-write("<p>Сумма чисел от 1 до ", k, ": ", s, "</p>");
-if(s > 320){
-write("<p>Больше 320</p>");
-}else{
-write("<p>Меньше 320</p>");
+
+for(i = 1; i <= 10; i++){
+	write("<p>");
+	for(j = 1; j <= 10; j++){
+		s = i*j;
+		write(s, " ");
+		if(s < 10) write(" . ");
+	}
+	write("</p>");
 }
+
 write("</body>");
 write("</html>");
 
